@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FB Auto Pro - Giả Lập</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; }
+    .nav-active { border-bottom: 4px solid #1877f2; color: #1877f2; font-weight: 600; }
+    .log-line { font-size: 13px; line-height: 1.4; }
+  </style>
+</head>
+<body class="bg-gray-100">
+
+<div class="max-w-lg mx-auto bg-white min-h-screen">
+
+  <!-- Header -->
+  <div class="bg-blue-600 text-white p-4 sticky top-0">
+    <h1 class="text-2xl font-bold flex items-center gap-2">
+      <i class="fas fa-robot"></i> FB AUTO PRO
+    </h1>
+    <p class="text-sm opacity-90">Giả lập đăng bài theo lịch</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex border-b bg-white sticky top-14 z-40">
+    <button onclick="switchTab(0)" class="tab-btn flex-1 py-4 nav-active" id="tab0">Tạo Bài</button>
+    <button onclick="switchTab(1)" class="tab-btn flex-1 py-4" id="tab1">Lịch Đăng</button>
+    <button onclick="switchTab(2)" class="tab-btn flex-1 py-4" id="tab2">Kịch Bản</button>
+    <button onclick="switchTab(3)" class="tab-btn flex-1 py-4" id="tab3">Auto</button>
+  </div>
+
+  <!-- Tab 0: Tạo Bài -->
+  <div class="tab-content p-5" id="content0">
+    <textarea id="postContent" rows="5" class="w-full border rounded-3xl p-4" placeholder="Nội dung bài viết..."></textarea>
+    
+    <div class="mt-4">
+      <label class="block text-sm mb-2">Hình ảnh / Video (Link)</label>
+      <input type="text" id="mediaLink" placeholder="Dán link ảnh hoặc video" class="w-full border rounded-2xl px-4 py-3">
+    </div>
+
+    <div class="mt-6">
+      <label class="block text-sm mb-3">Chọn Nhóm</label>
+      <div id="groupList" class="max-h-60 overflow-auto border rounded-3xl p-4 space-y-3"></div>
+    </div>
+
+    <button onclick="quickSave()" class="w-full mt-8 bg-blue-600 text-white py-5 rounded-3xl font-semibold">
+      Lưu Nhanh Bài Viết
+    </button>
+  </div>
+
+  <!-- Tab 1: Lịch Đăng -->
+  <div class="tab-content hidden p-5" id="content1">
+    <div class="flex gap-3">
+      <input type="time" id="scheduleTime" class="flex-1 border rounded-2xl px-4 py-3">
+      <button onclick="addToSchedule()" class="bg-green-600 text-white px-6 rounded-2xl">Thêm Lịch</button>
+    </div>
+    <div id="scheduleContainer" class="mt-6 space-y-4"></div>
+  </div>
+
+  <!-- Tab 2: Kịch Bản -->
+  <div class="tab-content hidden p-5" id="content2">
+    <input type="text" id="scenarioName" placeholder="Tên kịch bản" class="w-full border rounded-2xl px-4 py-3 mb-4">
+    <textarea id="scenarioContent" rows="6" class="w-full border rounded-3xl p-4" placeholder="Nội dung kịch bản..."></textarea>
+    <button onclick="saveScenario()" class="w-full mt-6 bg-indigo-600 text-white py-4 rounded-3xl">Lưu Kịch Bản</button>
+    
+    <div id="scenarioList" class="mt-8"></div>
+  </div>
+
+  <!-- Tab 3: Auto -->
+  <div class="tab-content hidden p-5" id="content3">
+    <div class="bg-green-50 border-2 border-green-300 rounded-3xl p-8 text-center">
+      <i id="autoIcon" class="fas fa-clock text-6xl text-gray-400 mb-4"></i>
+      <h3 class="font-bold text-xl">Trạng thái tự động</h3>
+      <div id="autoStatus" class="text-3xl font-bold mt-2 text-red-500">TẮT</div>
+      
+      <button onclick="toggleAutoMode()" id="autoButton" 
+              class="mt-10 w-full py-6 rounded-3xl text-xl font-bold bg-green-600 text-white">
+        BẬT TỰ ĐỘNG GIẢ LẬP
+      </button>
+    </div>
+
+    <div id="logBox" class="mt-6 bg-black text-green-400 p-4 rounded-3xl h-64 overflow-auto text-xs"></div>
+  </div>
+</div>
+
+<script>
+  let schedules = JSON.parse(localStorage.getItem('fbSchedules')) || [];
+  let scenarios = JSON.parse(localStorage.getItem('fbScenarios')) || [];
+  let isAutoOn = false;
+  let autoInterval = null;
+  let logs = [];
+
+  const groups = [
+    {id:1, name: "Nhóm Mua Bán"},
+    {id:2, name: "Kinh Doanh Online"},
+    {id:3, name: "Cộng Đồng Lam Đồng"},
+    {id:4, name: "Quảng Cáo Sản Phẩm"}
+  ];
+
+  function log(text) {
+    const time = new Date().toLocaleTimeString('vi-VN');
+    logs.unshift(`[${time}] ${text}`);
+    if (logs.length > 30) logs.pop();
+    document.getElementById('logBox').innerHTML = logs.join('<br>');
+  }
+
+  function renderGroups() {
+    document.getElementById('groupList').innerHTML = groups.map(g => `
+      <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-2xl">
+        <input type="checkbox" class="group-cb w-5 h-5 accent-blue-600" data-id="${g.id}">
+        <span>${g.name}</span>
+      </div>
+    `).join('');
+  }
+
+  function quickSave() {
+    alert("Đã lưu bài viết nhanh!");
+  }
+
+  function addToSchedule() {
+    const time = document.getElementById('scheduleTime').value;
+    if (!time) return alert("Chọn giờ đăng!");
+
+    schedules.push({id: Date.now(), time: time, active: true});
+    localStorage.setItem('fbSchedules', JSON.stringify(schedules));
+    renderSchedules();
+    log(`Đã thêm lịch đăng lúc ${time}`);
+  }
+
+  function renderSchedules() {
+    const html = schedules.map(s => `
+      <div class="border rounded-3xl p-5">
+        <span class="text-2xl font-bold text-blue-600">${s.time}</span>
+        <button onclick="removeSchedule(${s.id})" class="float-right text-red-500">Xóa</button>
+      </div>
+    `).join('');
+    document.getElementById('scheduleContainer').innerHTML = html || "<p class='text-center text-gray-400 py-8'>Chưa có lịch nào</p>";
+  }
+
+  function removeSchedule(id) {
+    schedules = schedules.filter(s => s.id !== id);
+    localStorage.setItem('fbSchedules', JSON.stringify(schedules));
+    renderSchedules();
+  }
+
+  function saveScenario() {
+    const name = document.getElementById('scenarioName').value || "Kịch bản mới";
+    const content = document.getElementById('scenarioContent').value.trim();
+    if (!content) return alert("Nhập nội dung kịch bản!");
+
+    scenarios.push({id: Date.now(), name, content});
+    localStorage.setItem('fbScenarios', JSON.stringify(scenarios));
+    renderScenarios();
+    alert("✅ Lưu kịch bản thành công");
+  }
+
+  function renderScenarios() {
+    const html = scenarios.map(sc => `
+      <div class="border rounded-3xl p-4 mb-3">
+        <p class="font-medium">${sc.name}</p>
+        <p class="text-sm text-gray-600 line-clamp-2">${sc.content}</p>
+      </div>
+    `).join('');
+    document.getElementById('scenarioList').innerHTML = html;
+  }
+
+  function toggleAutoMode() {
+    isAutoOn = !isAutoOn;
+    const btn = document.getElementById('autoButton');
+    const status = document.getElementById('autoStatus');
+    const icon = document.getElementById('autoIcon');
+
+    if (isAutoOn) {
+      btn.textContent = "ĐANG CHẠY - TẮT";
+      btn.classList.replace('bg-green-600', 'bg-red-600');
+      status.textContent = "HOẠT ĐỘNG";
+      status.classList.replace('text-red-500', 'text-green-600');
+      icon.classList.replace('text-gray-400', 'text-green-500');
+      startAuto();
+      log("🚀 CHẾ ĐỘ TỰ ĐỘNG ĐÃ BẬT");
+    } else {
+      btn.textContent = "BẬT TỰ ĐỘNG GIẢ LẬP";
+      btn.classList.replace('bg-red-600', 'bg-green-600');
+      status.textContent = "TẮT";
+      status.classList.replace('text-green-600', 'text-red-500');
+      icon.classList.replace('text-green-500', 'text-gray-400');
+      clearInterval(autoInterval);
+      log("⛔ TỰ ĐỘNG ĐÃ TẮT");
+    }
+  }
+
+  function startAuto() {
+    clearInterval(autoInterval);
+    autoInterval = setInterval(() => {
+      const now = new Date();
+      const current = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+
+      schedules.forEach(s => {
+        if (s.time === current) {
+          log(`🔥 ĐẾN GIỜ ĐĂNG - ${current}`);
+          const content = scenarios.length > 0 ? scenarios[0].content : "Nội dung mặc định";
+          
+          if (confirm(`Đến giờ đăng!\nGiờ: ${current}\n\nNhấn OK để copy nội dung`)) {
+            navigator.clipboard.writeText(content);
+            log("✅ ĐÃ COPY NỘI DUNG - Chuyển sang fbtool.net dán và đăng");
+            alert("Nội dung đã copy! Chuyển sang fbtool.net để đăng.");
+          }
+        }
+      });
+    }, 10000);
+  }
+
+  function switchTab(n) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    document.getElementById('content' + n).classList.remove('hidden');
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('nav-active'));
+    document.getElementById('tab' + n).classList.add('nav-active');
+  }
+
+  window.onload = () => {
+    renderGroups();
+    renderSchedules();
+    renderScenarios();
+    switchTab(0);
+    log("🚀 Tool FB Auto Pro đã sẵn sàng");
+  };
+</script>
+</body>
+</html>
